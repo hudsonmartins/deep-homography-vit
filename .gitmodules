@@ -1,0 +1,3 @@
+[submodule "TimeSformer"]
+	path = TimeSformer
+	url = git@github.com:hudsonmartins/TimeSformer.git
