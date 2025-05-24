@@ -39,7 +39,18 @@ class HomographyDataset(Dataset):
         return len(self.image_paths)
 
     def __getitem__(self, idx):
-        img_path = self.image_paths[idx]
+        while True:
+            img_path = self.image_paths[idx]
+            pil_img = Image.open(img_path).convert('RGB')
+            img = np.array(pil_img)
+
+            h, w, _ = img.shape
+            ps = self.patch_size
+            margin = self.rho
+
+            if w >= ps + 2 * margin and h >= ps + 2 * margin:
+                break  # valid image
+            idx = np.random.randint(0, len(self)) # retry with a different image
 
         # Load image as RGB PIL Image
         pil_img = Image.open(img_path).convert('RGB')
@@ -49,8 +60,6 @@ class HomographyDataset(Dataset):
         ps = self.patch_size
         margin = self.rho
         
-        if w < self.patch_size + 2 * self.rho or h < self.patch_size + 2 * self.rho:
-            return self[np.random.randint(0, len(self))]
         
         # Random top-left corner
         x = np.random.randint(margin, w - ps - margin)
@@ -106,33 +115,3 @@ class HomographyDataset(Dataset):
             "base_corners": base_corners,  # (4, 2)
             "base_image": img  # RGB image as numpy array for visualization
         }
-
-if __name__ == "__main__":
-    import glob
-    from torch.utils.data import DataLoader
-    import time
-    # Example usage
-    image_paths = glob.glob('/home/hudson/Desktop/Unicamp/datasets/coco/train2017/*.jpg')
-
-    dataset = HomographyDataset(image_paths, patch_size=128, target_size=640, rho=32, train=True)
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True, num_workers=4, collate_fn=custom_collate)
-
-    for batch in dataloader:
-        image_pair = batch["image_pair"]      # (B, 6, target_size, target_size)
-        gt_homography = batch["homography"]   # (B, 8)
-        
-        base_image = batch["base_image"][0]
-        base_corners = batch["base_corners"][0].numpy()  
-        
-        scale = dataset.target_size / dataset.patch_size
-        
-        gt_deltas = gt_homography[0].numpy()
-        gt_deltas = gt_deltas / scale
-
-        
-        pred_deltas = gt_deltas + np.random.uniform(-32, 32, size=(1, 8))
-        pred_deltas = pred_deltas / scale
-
-        patches = image_pair[0].numpy()
-        visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_deltas, patches)
-        time.sleep(1)

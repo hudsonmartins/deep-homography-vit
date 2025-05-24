@@ -19,6 +19,8 @@ default_train_conf = {
     "epochs": 10,
     "lr": 0.001,
     "tensorboard_dir": "runs",
+    "max_train_iter": 3000,
+    "max_val_iter": 500,
 }
 default_train_conf = OmegaConf.create(default_train_conf)
 
@@ -26,11 +28,16 @@ default_train_conf = OmegaConf.create(default_train_conf)
 def homography_loss(pred, target):
     return nn.functional.mse_loss(pred, target, reduction='mean')
 
-def train_epoch(model, dataloader, optimizer, device):
+def train_epoch(model, dataloader, optimizer, device, max_iters=None):
     model.train()
     total_loss = 0.0
+
+    if max_iters is None or len(dataloader) < max_iters:
+        max_iters = len(dataloader)
     
-    for batch in tqdm(dataloader, desc="Training", leave=False):
+    for i, batch in enumerate(tqdm(dataloader, total=max_iters, desc="Training", leave=False)):
+        if i >= max_iters:
+            break
         image_pair = batch["image_pair"].to(device)
         gt_homography = batch["homography"].to(device)  # (B, 8)
         optimizer.zero_grad()
@@ -43,15 +50,20 @@ def train_epoch(model, dataloader, optimizer, device):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        
     return total_loss / len(dataloader)
 
 
-def validate_epoch(model, dataloader, device):
+def validate_epoch(model, dataloader, device, max_iters=None):
     model.eval()
     total_loss = 0.0
     sample = []
+    if max_iters is None or len(dataloader) < max_iters:
+        max_iters = len(dataloader)
     with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Validation", leave=False):
+        for i, batch in enumerate(tqdm(dataloader, total=max_iters, desc="Validation", leave=False)):
+            if i >= max_iters:
+                break
             image_pair = batch["image_pair"].to(device)
             gt_homography = batch["homography"].to(device)
             data = {
@@ -69,15 +81,15 @@ def validate_epoch(model, dataloader, device):
     return total_loss / len(dataloader), sample
 
 
-def train_model(model, train_loader, val_loader, optimizer, num_epochs, device, writer):
+def train_model(model, train_loader, val_loader, optimizer, device, writer, config):
     best_val_loss = float('inf')
-    for epoch in range(num_epochs):
-        train_loss = train_epoch(model, train_loader, optimizer, device)
-        logging.info(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}")
+    for epoch in range(config.epochs):
+        train_loss = train_epoch(model, train_loader, optimizer, device, max_iters=config.max_train_iter)
+        logging.info(f"Epoch [{epoch+1}/{config.epochs}], Train Loss: {train_loss:.4f}")
         writer.add_scalar('Loss/train', train_loss, epoch)
 
-        val_loss, sample = validate_epoch(model, val_loader, device)
-        logging.info(f"Epoch [{epoch+1}/{num_epochs}], Val Loss: {val_loss:.4f}")
+        val_loss, sample = validate_epoch(model, val_loader, device, max_iters=config.max_val_iter)
+        logging.info(f"Epoch [{epoch+1}/{config.epochs}], Val Loss: {val_loss:.4f}")
         writer.add_scalar('Loss/val', val_loss, epoch)
         
         # Visualize samples
@@ -169,7 +181,7 @@ def main():
     # Set up TensorBoard writer
     writer = SummaryWriter(log_dir=config.tensorboard_dir)
 
-    train_model(model, train_loader, val_loader, optimizer, config.epochs, device, writer)
+    train_model(model, train_loader, val_loader, optimizer, device, writer, config)
 
 
 if __name__ == "__main__":
