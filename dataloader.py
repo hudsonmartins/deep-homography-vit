@@ -39,27 +39,20 @@ class HomographyDataset(Dataset):
         return len(self.image_paths)
 
     def __getitem__(self, idx):
-        while True:
-            img_path = self.image_paths[idx]
-            pil_img = Image.open(img_path).convert('RGB')
-            img = np.array(pil_img)
 
-            h, w, _ = img.shape
-            ps = self.patch_size
-            margin = self.rho
-
-            if w >= ps + 2 * margin and h >= ps + 2 * margin:
-                break  # valid image
-            idx = np.random.randint(0, len(self)) # retry with a different image
-
-        # Load image as RGB PIL Image
+        img_path = self.image_paths[idx]
         pil_img = Image.open(img_path).convert('RGB')
-        img = np.array(pil_img)  # Convert to numpy for OpenCV use
+        img = np.array(pil_img)
 
         h, w, _ = img.shape
         ps = self.patch_size
         margin = self.rho
-        
+
+        if w < ps + 2 * margin or h < ps + 2 * margin:
+            pad_h = max(0, ps + 2 * margin - h + 1)
+            pad_w = max(0, ps + 2 * margin - w + 1)
+            img = cv2.copyMakeBorder(img, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+            h, w, _ = img.shape            
         
         # Random top-left corner
         x = np.random.randint(margin, w - ps - margin)
