@@ -1,0 +1,32 @@
+epochs: 100
+lr: 0.001
+max_train_iter: 3000
+max_val_iter: 500
+num_workers: 8
+data:
+  batch_size: 8
+  num_workers: 8
+  train:
+    shuffle: True
+    images_dir: data/coco/train2017
+    patch_size: 128
+    rho: 32
+    target_size: 640
+  val:
+    shuffle: False
+    images_dir: data/coco/val2017
+    patch_size: 128
+    rho: 32
+    target_size: 640
+vit:
+  freeze: True
+  image_size: [640, 640]
+  patch_size: 16
+  dim_emb: 384
+  depth: 12
+  heads: 6
+  pretrained: True
+  default_cfg: 
+    url: https://dl.fbaipublicfiles.com/deit/deit_small_patch16_224-cd65a155.pth
+    first_conv: "patch_embed.proj"
+    classifier: "head"
