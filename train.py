@@ -51,15 +51,17 @@ def train_epoch(model, dataloader, optimizer, device, max_iters=None):
         optimizer.step()
         total_loss += loss.item()
         
-    return total_loss / len(dataloader)
+    return total_loss / max_iters
 
 
 def validate_epoch(model, dataloader, device, max_iters=None):
     model.eval()
     total_loss = 0.0
     sample = []
+
     if max_iters is None or len(dataloader) < max_iters:
         max_iters = len(dataloader)
+
     with torch.no_grad():
         for i, batch in enumerate(tqdm(dataloader, total=max_iters, desc="Validation", leave=False)):
             if i >= max_iters:
@@ -78,7 +80,7 @@ def validate_epoch(model, dataloader, device, max_iters=None):
                            'homography': batch["homography"][0],
                            'base_image': batch["base_image"][0],
                            'pred_homography': pred_homography[0]})        
-    return total_loss / len(dataloader), sample
+    return total_loss / max_iters, sample
 
 
 def train_model(model, train_loader, val_loader, optimizer, device, writer, config):
@@ -178,6 +180,13 @@ def main():
         for param in model.regressor.parameters():
             param.requires_grad = True
     
+    if(config.load_checkpoint):
+        checkpoint = torch.load(config.load_checkpoint, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        logging.info(f"Loaded checkpoint from {config.load_checkpoint}")
+
+
     # Set up TensorBoard writer
     writer = SummaryWriter(log_dir=config.tensorboard_dir)
 
