@@ -84,7 +84,8 @@ class HomographyDataset(Dataset):
         patch_B = Image.fromarray(patch_B)
 
         if self.train:
-            seed = torch.randint(0, 2**32, (1,)).item()
+            worker_info = torch.utils.data.get_worker_info()
+            seed =  worker_info.seed if worker_info else random.randint(0, 2**32 - 1)
             random.seed(seed)
             torch.manual_seed(seed)
             patch_A_tensor = self.transform(patch_A)

@@ -57,7 +57,7 @@ def train_epoch(model, dataloader, optimizer, device, max_iters=None):
 def validate_epoch(model, dataloader, device, max_iters=None):
     model.eval()
     total_loss = 0.0
-    sample = []
+    sample = {}
 
     if max_iters is None or len(dataloader) < max_iters:
         max_iters = len(dataloader)
@@ -75,11 +75,13 @@ def validate_epoch(model, dataloader, device, max_iters=None):
             pred_homography = model(data)
             loss = homography_loss(pred_homography, gt_homography)
             total_loss += loss.item()
-            sample.append({'patches': batch["image_pair"][0],
-                           'base_corners': batch["base_corners"][0],
-                           'homography': batch["homography"][0],
-                           'base_image': batch["base_image"][0],
-                           'pred_homography': pred_homography[0]})        
+            if(i == 0):
+                sample = {'patches': batch["image_pair"],
+                            'base_corners': batch["base_corners"],
+                            'homography': batch["homography"],
+                            'base_image': batch["base_image"],
+                            'pred_homography': pred_homography}
+                
     return total_loss / max_iters, sample
 
 
@@ -95,28 +97,31 @@ def train_model(model, train_loader, val_loader, optimizer, device, writer, conf
         writer.add_scalar('Loss/val', val_loss, epoch)
         
         # Visualize samples
-        for i in range(len(sample)):
-            sample_patches = sample[i]['patches'].cpu().numpy()
-            sample_base_image = sample[i]['base_image']
-            sample_base_corners = sample[i]['base_corners'].cpu().numpy()
-            sample_gt_deltas = sample[i]['homography'].cpu().numpy()
-            sample_pred_deltas = sample[i]['pred_homography'].cpu().numpy()
+        for i in range(sample['patches'].shape[0]):
+            sample_patches = sample['patches'][i].cpu().numpy()
+            sample_base_image = sample['base_image'][i]
+            sample_base_corners = sample['base_corners'][i].cpu().numpy()
+            sample_gt_deltas = sample['homography'][i].cpu().numpy()
+            sample_pred_deltas = sample['pred_homography'][i].cpu().numpy()
     
             scale = val_loader.dataset.target_size / val_loader.dataset.patch_size
             sample_gt_deltas = sample_gt_deltas / scale
             sample_pred_deltas = sample_pred_deltas / scale
             fig = visualize_homography_estimation(sample_base_image, sample_base_corners, sample_gt_deltas, 
                                                 sample_pred_deltas, sample_patches)
-            fig = to_tensor(fig) 
+            fig = to_tensor(fig)
             writer.add_image(f"Homography/Overlay_{i}", fig, global_step=epoch)
-
+            
         # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), 'best_model.pth')
+            torch.save({'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'epoch': epoch}, 'best_model.pth')
             logging.info(f"Model saved at epoch {epoch+1} with validation loss: {best_val_loss:.4f}")
     
     writer.flush()
+    writer.close()
     return best_val_loss
 
 
@@ -124,7 +129,7 @@ def custom_collate(batch):
     batch_dict = {}
     for key in batch[0]:
         if key == "base_image":
-            batch_dict[key] = [sample[key] for sample in batch]  # keep as list
+            batch_dict[key] = [sample[key] for sample in batch]  # only visualization, keep as list
         else:
             batch_dict[key] = default_collate([sample[key] for sample in batch])
     return batch_dict
@@ -147,8 +152,12 @@ def get_dataloaders(data_config):
         train=False
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=data_config.batch_size, shuffle=data_config.train.shuffle, num_workers=data_config.num_workers, collate_fn=custom_collate)
-    val_loader = DataLoader(val_dataset, batch_size=data_config.batch_size, shuffle=data_config.val.shuffle, num_workers=data_config.num_workers, collate_fn=custom_collate)
+    train_loader = DataLoader(train_dataset, batch_size=data_config.batch_size, 
+                              shuffle=data_config.train.shuffle, num_workers=data_config.num_workers, 
+                              collate_fn=custom_collate, pin_memory=args.use_cuda)
+    val_loader = DataLoader(val_dataset, batch_size=data_config.batch_size, 
+                            shuffle=data_config.val.shuffle, num_workers=data_config.num_workers, 
+                            collate_fn=custom_collate, pin_memory=args.use_cuda)
 
     return train_loader, val_loader
 
@@ -167,19 +176,18 @@ def main():
     
     # Initialize model
     model = HomographyRegressor(config).to(device)
-
-    # Set up optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-
-    # Set up data loaders
-    train_loader, val_loader = get_dataloaders(config.data)
     
     if(config.vit.freeze):
         for param in model.vit.parameters():
             param.requires_grad = False
         for param in model.regressor.parameters():
             param.requires_grad = True
-    
+
+    # Set up optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
+    # Set up data loaders
+    train_loader, val_loader = get_dataloaders(config.data)    
     if(config.load_checkpoint):
         checkpoint = torch.load(config.load_checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
