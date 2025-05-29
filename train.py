@@ -107,8 +107,11 @@ def train_model(model, train_loader, val_loader, optimizer, device, writer, conf
             scale = val_loader.dataset.target_size / val_loader.dataset.patch_size
             sample_gt_deltas = sample_gt_deltas / scale
             sample_pred_deltas = sample_pred_deltas / scale
-            fig = visualize_homography_estimation(sample_base_image, sample_base_corners, sample_gt_deltas, 
-                                                sample_pred_deltas, sample_patches)
+            fig = visualize_homography_estimation(sample_base_image, 
+                                                  sample_base_corners, 
+                                                  sample_gt_deltas*config.data.norm_factor, 
+                                                  sample_pred_deltas*config.data.norm_factor, 
+                                                  sample_patches)
             fig = to_tensor(fig)
             writer.add_image(f"Homography/Overlay_{i}", fig, global_step=epoch)
             
@@ -141,6 +144,7 @@ def get_dataloaders(data_config):
         patch_size=data_config.train.patch_size,
         rho=data_config.train.rho,
         target_size=data_config.train.target_size,
+        norm_factor=data_config.norm_factor,
         train=True
     )
 
@@ -149,6 +153,7 @@ def get_dataloaders(data_config):
         patch_size=data_config.val.patch_size,
         rho=data_config.val.rho,
         target_size=data_config.val.target_size,
+        norm_factor=data_config.norm_factor,
         train=False
     )
 

@@ -9,7 +9,7 @@ from utils import visualize_homography_estimation
 
 
 class HomographyDataset(Dataset):
-    def __init__(self, image_paths, patch_size=128, rho=32, target_size=640, train=True):
+    def __init__(self, image_paths, patch_size=128, rho=32, target_size=640, norm_factor=160, train=True):
         """
         Args:
             image_paths: list of image paths
@@ -22,6 +22,7 @@ class HomographyDataset(Dataset):
         self.rho = rho
         self.target_size = target_size
         self.train = train
+        self.norm_factor = norm_factor
         if(self.train):
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
@@ -102,7 +103,9 @@ class HomographyDataset(Dataset):
         # Scale deltas to match resized image
         scale = self.target_size / self.patch_size
         deltas_scaled = deltas * scale
-        label = deltas_scaled.reshape(-1)  # (8,)
+        label = deltas_scaled/self.norm_factor  # Normalize deltas
+        label = label.reshape(-1)
+
 
         return {
             "image_pair": input_tensor,  # (6, target_size, target_size)
