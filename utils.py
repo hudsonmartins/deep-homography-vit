@@ -1,10 +1,21 @@
 import cv2
+import matplotlib
 import numpy as np
 from io import BytesIO
 from PIL import Image
+from torch.utils.data._utils.collate import default_collate
 from matplotlib import pyplot as plt
-import matplotlib
-matplotlib.use('Agg')  # Use a non-GUI backend for matplotlib
+matplotlib.use('Agg')  
+
+
+def custom_collate(batch):
+    batch_dict = {}
+    for key in batch[0]:
+        if key == "base_image":
+            batch_dict[key] = [sample[key] for sample in batch]  # only visualization, keep as list
+        else:
+            batch_dict[key] = default_collate([sample[key] for sample in batch])
+    return batch_dict
 
 
 def four_point_to_homography(corner_deltas, base_corners):
@@ -13,7 +24,13 @@ def four_point_to_homography(corner_deltas, base_corners):
     return cv2.getPerspectiveTransform(base_corners, base_corners + corner_deltas)
 
 
-def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_deltas, patches):
+def homography_to_four_points(homography, base_corners):
+    base_corners = np.array(base_corners, dtype=np.float32).reshape(4, 2)
+    transformed_corners = cv2.perspectiveTransform(base_corners.reshape(-1, 1, 2), homography)
+    return (transformed_corners - base_corners.reshape(-1, 1, 2)).reshape(4, 2).astype(np.int32)
+
+
+def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_deltas, patches, text=None):
     
     base_corners = np.array(base_corners, dtype=np.int32)
     gt_deltas = np.array(gt_deltas, dtype=np.int32).reshape(4, 2)
@@ -41,14 +58,12 @@ def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_de
         pt2_pred = tuple(base_corners[(i + 1) % 4] + pred_deltas[(i + 1) % 4])
         cv2.line(warped_image_bgr, pt1_pred, pt2_pred, (0, 0, 255), 2)
 
-    base_image_rgb = base_image_bgr[:, :, ::-1]  # Convert BGR back to RGB for matplotlib
-    warped_image_rgb = warped_image_bgr[:, :, ::-1]  # Convert BGR back to RGB for matplotlib
-    #patches 6, 128,128
+    base_image_rgb = base_image_bgr[:, :, ::-1]  # Convert BGR back to RGB for pkots
+    warped_image_rgb = warped_image_bgr[:, :, ::-1]  
 
-    patch_A = patches[:3, :, :].transpose(1, 2, 0)  # (128, 128, 3)
-    patch_B = patches[3:, :, :].transpose(1, 2, 0)  # (128, 128, 3)
+    patch_A = patches[:3, :, :].transpose(1, 2, 0)
+    patch_B = patches[3:, :, :].transpose(1, 2, 0) 
     
-    # Plot with matplotlib
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 2, 1)
     plt.imshow(base_image_rgb)
@@ -58,6 +73,8 @@ def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_de
     plt.subplot(2, 2, 2)
     plt.imshow(warped_image_rgb)
     plt.title('Warped Image with Predicted Corners')
+    if text:
+        plt.text(0.5, -0.1, text, ha='center', va='top', transform=plt.gca().transAxes, fontsize=12, color='red')   
     plt.axis('off')
 
     # Draw patches
@@ -73,12 +90,11 @@ def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_de
 
     plt.tight_layout()
     
-    # Save the figure to a numpy array (RGB)
     buf = BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
     image = Image.open(buf).convert('RGB')
-    image_np = np.array(image)  # (H, W, 3)
+    image_np = np.array(image)
     plt.close()
 
     return image_np

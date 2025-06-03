@@ -7,12 +7,11 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate
 from torchvision.transforms.functional import to_tensor
 
 from model import HomographyRegressor
 from dataloader import HomographyDataset
-from utils import visualize_homography_estimation
+from utils import visualize_homography_estimation, custom_collate
 
 
 default_train_conf = {
@@ -126,16 +125,6 @@ def train_model(model, train_loader, val_loader, optimizer, device, writer, conf
     writer.flush()
     writer.close()
     return best_val_loss
-
-
-def custom_collate(batch):
-    batch_dict = {}
-    for key in batch[0]:
-        if key == "base_image":
-            batch_dict[key] = [sample[key] for sample in batch]  # only visualization, keep as list
-        else:
-            batch_dict[key] = default_collate([sample[key] for sample in batch])
-    return batch_dict
 
 
 def get_dataloaders(data_config):

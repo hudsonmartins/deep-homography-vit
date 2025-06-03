@@ -16,6 +16,8 @@ class HomographyDataset(Dataset):
             patch_size: size of original square patch before resizing
             rho: max perturbation in pixels
             target_size: final resized patch size
+            norm_factor: normalization factor for deltas
+            train: whether the dataset is for training or validation
         """
         self.image_paths = image_paths
         self.patch_size = patch_size
@@ -84,18 +86,8 @@ class HomographyDataset(Dataset):
         patch_A = Image.fromarray(patch_A)
         patch_B = Image.fromarray(patch_B)
 
-        if self.train:
-            worker_info = torch.utils.data.get_worker_info()
-            seed =  worker_info.seed if worker_info else random.randint(0, 2**32 - 1)
-            random.seed(seed)
-            torch.manual_seed(seed)
-            patch_A_tensor = self.transform(patch_A)
-            random.seed(seed)
-            torch.manual_seed(seed)
-            patch_B_tensor = self.transform(patch_B)
-        else:
-            patch_A_tensor = self.transform(patch_A)
-            patch_B_tensor = self.transform(patch_B)
+        patch_A_tensor = self.transform(patch_A)
+        patch_B_tensor = self.transform(patch_B)
         
         # Stack patches
         input_tensor = torch.cat([patch_A_tensor, patch_B_tensor], dim=0)  # (6, H, W)
