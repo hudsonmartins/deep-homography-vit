@@ -3,8 +3,9 @@ import matplotlib
 import numpy as np
 from io import BytesIO
 from PIL import Image
-from torch.utils.data._utils.collate import default_collate
 from matplotlib import pyplot as plt
+from scipy.spatial.transform import Rotation as R
+from torch.utils.data._utils.collate import default_collate
 matplotlib.use('Agg')  
 
 
@@ -98,3 +99,31 @@ def visualize_homography_estimation(base_image, base_corners, gt_deltas, pred_de
     plt.close()
 
     return image_np
+
+def visualize_camera_poses(trans, rot, labels):
+    fig, axs = plt.subplots(2, 1, figsize=(6, 6), dpi=700)
+    for (t, r, label) in zip(trans, rot, labels):
+        # Extracting translation and rotation components
+        xy = t[:2]
+        xz = t[[0, 2]]
+        rotation = R.from_euler('ZYX', r).as_matrix()
+
+        # Plot 1 shows XY plane
+        axs[0].quiver(*xy, rotation[0, 0], rotation[1, 0], headaxislength=0, headwidth=0, headlength=0, color='r', label='X axis')
+        axs[0].quiver(*xy, rotation[0, 1], rotation[1, 1], headaxislength=0, headwidth=0, headlength=0, color='g', label='Y axis')
+        axs[0].text(xy[0], xy[1], label, fontsize=12, color='black')
+        axs[0].set_xlabel('X')
+        axs[0].set_ylabel('Y')
+
+        # Plot 2 shows XZ plane
+        axs[1].quiver(*xz, rotation[0, 0], rotation[2, 0], headaxislength=0, headwidth=0, headlength=0, color='r', label='X axis')
+        axs[1].quiver(*xz, rotation[0, 2], rotation[2, 2], headaxislength=0, headwidth=0, headlength=0, color='b', label='Z axis')
+        axs[1].text(xz[0], xz[1], label, fontsize=12, color='black')
+        axs[1].set_xlabel('X')
+        axs[1].set_ylabel('Z')
+
+    for i in range(2):
+        axs[i].grid(True)
+        fig.tight_layout(pad=0.5)
+    plt.close()
+    return fig

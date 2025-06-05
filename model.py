@@ -85,7 +85,7 @@ class VORegressor(nn.Module):
         self.regressor = nn.Sequential(
             nn.Linear(config.vit.dim_emb, 256),
             nn.ReLU(),
-            nn.Linear(256, 6)  # VO: [tx, ty, tz, rx, ry, rz]
+            nn.Linear(256, 6)
         )
 
     def forward(self, data):

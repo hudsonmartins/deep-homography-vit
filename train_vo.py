@@ -12,6 +12,7 @@ from omegaconf import OmegaConf
 
 from iterators import get_iterator
 from model import VORegressor
+from utils import visualize_camera_poses
 
 # Default training configuration
 default_conf = {
@@ -133,8 +134,17 @@ def train_model(model, train_loader, val_loader, optimizer, device, writer, conf
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'epoch': epoch
-            }, os.path.join(config.tensorboard_dir, f"best_model.pth"))
+            }, "best_model.pth")
             logging.info(f"Saved best model at epoch {epoch} with loss {best_loss:.4f}")
+
+            # draw camera poses and save to TensorBoard
+            origin = torch.tensor([0, 0, 0, 0, 0, 0])
+            fig_cameras = visualize_camera_poses(
+                [origin[3:], sample['pred'][0, 3:].detach().cpu(), sample['gt'][0, 3:].detach().cpu()],
+                [origin[:3], sample['pred'][0, :3].detach().cpu(), sample['gt'][0, :3].detach().cpu()],
+                ["origin", "predicted", "ground truth"]
+            )
+            writer.add_figure("val/poses", fig_cameras, epoch)
     
     writer.flush()
     writer.close()
