@@ -163,7 +163,6 @@ def main():
 
     # Set up logging
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
 
     # Set up device
     device = torch.device("cuda" if args.use_cuda and torch.cuda.is_available() else "cpu")
@@ -172,7 +171,7 @@ def main():
     model = HomographyRegressor(config).to(device)
     
     if(config.vit.freeze):
-        for param in model.vit.parameters():
+        for param in model.encoder.parameters():
             param.requires_grad = False
         for param in model.regressor.parameters():
             param.requires_grad = True
