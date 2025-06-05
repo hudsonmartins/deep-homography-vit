@@ -64,7 +64,8 @@ def val_epoch(model, val_loader, criterion, device, max_iters=None):
 
                 data = {
                     'view0': {'image': images[:, 0].to(device)},
-                    'view1': {'image': images[:, 1].to(device)}
+                    'view1': {'image': images[:, 1].to(device)},
+                    'K': Ks.to(device)
                 }
                 gt = gt.to(device)
                 output = model(data)
@@ -97,7 +98,8 @@ def train_epoch(model, train_loader, optimizer, device, criterion, max_iters=Non
 
             data = {
                 'view0': {'image': images[:, 0].to(device)},
-                'view1': {'image': images[:, 1].to(device)}
+                'view1': {'image': images[:, 1].to(device)},
+                'K': Ks.to(device)
             }
             
             gt = gt.to(device)

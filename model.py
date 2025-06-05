@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 from functools import partial
 from timesformer.models.helpers import load_pretrained
 from timesformer.models.vit import VisionTransformer
-    
+from utils import make_intrinsics_layer
 
 class ViTEncoder(nn.Module):
     def __init__(self, config):
@@ -78,10 +78,19 @@ class VORegressor(nn.Module):
         # Load pretrained homography weights into encoder
         logging.info("Loading homography encoder weights")
         checkpoint = torch.load(config.vit.homography_weights, map_location=torch.device("cuda"))
-
-        state_dict = {k.replace("encoder.", ""): v for k, v in checkpoint['model_state_dict'].items() if "encoder." in k}
+        state_dict = checkpoint['model_state_dict']
         self.encoder.load_state_dict(state_dict, strict=False)
 
+        self.adapter = nn.Sequential(
+            nn.Conv2d(5, 3, kernel_size=1, bias=False)
+        )
+
+        with torch.no_grad():
+            # Identity for RGB, zero for coordinates
+            weight = torch.zeros(3, 5, 1, 1)
+            weight[:, :3] = torch.eye(3).unsqueeze(-1).unsqueeze(-1)
+            self.adapter[0].weight.copy_(weight)
+        
         self.regressor = nn.Sequential(
             nn.Linear(config.vit.dim_emb, 256),
             nn.ReLU(),
@@ -89,7 +98,16 @@ class VORegressor(nn.Module):
         )
 
     def forward(self, data):
-        x = self.encoder(data['view0']['image'], data['view1']['image'])
+        il = make_intrinsics_layer(data['view0']['image'].shape[2],
+                                   data['view0']['image'].shape[3],
+                                   data['K'])
+        
+        im0 = torch.cat([data['view0']['image'], il], dim=1)
+        im1 = torch.cat([data['view1']['image'], il], dim=1)
+        im0 = self.adapter(im0)
+        im1 = self.adapter(im1)
+        x = self.encoder(im0, im1)
+
         return self.regressor(x)
 
 
@@ -110,12 +128,9 @@ if __name__ == "__main__":
     model = VORegressor(OmegaConf.create(config))
     
     data = {
-        'view0': {
-            'image': torch.randn(1, 3, 640, 640),
-        },
-        'view1': {
-            'image': torch.randn(1, 3, 640, 640),
-        }
+        'view0': {'image': torch.randn(1, 3, 640, 640)},
+        'view1': {'image': torch.randn(1, 3, 640, 640)},
+        'K': torch.tensor([[600.0, 600.0, 320.0, 240.0]])
     }
 
     output = model(data)
