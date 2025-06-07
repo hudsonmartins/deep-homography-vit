@@ -45,7 +45,6 @@ def get_iterator(datasets_names, train, **kwargs):
         if(dataset == 'kitti'):
             datasets.append(get_kitti(**kwargs['kitti'], train=train))
         elif(dataset == 'queenscamp'):
-
             datasets.append(get_queenscamp(**kwargs['queenscamp'], train=train))
         else:
             raise ValueError(f"Unknown dataset: {dataset}")
@@ -104,7 +103,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     loader = get_iterator(
-        datasets_names=['kitti'],
+        datasets_names=['kitti', 'queenscamp'],
         train=True,
         kitti = {
             'data_path': '/home/hudson/Desktop/Unicamp/datasets/kitti',
