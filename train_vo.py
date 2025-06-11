@@ -121,7 +121,7 @@ def train_model(model, train_loader, val_loader, optimizer, device, writer, conf
     best_loss = float("inf")
     for epoch in range(config.epochs):
         # Train the model for one epoch
-        train_loss =train_epoch(model, train_loader, optimizer, device, criterion, max_iters=config.max_train_iter)
+        train_loss = train_epoch(model, train_loader, optimizer, device, criterion, max_iters=config.max_train_iter)
         logging.info(f"Epoch [{epoch+1}/{config.epochs}], Train Loss: {train_loss:.4f}")
         writer.add_scalar("train/loss", train_loss, epoch)
 

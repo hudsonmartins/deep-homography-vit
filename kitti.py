@@ -4,48 +4,15 @@ import numpy as np
 from PIL import Image
 import torch
 import random
+from scipy.spatial.transform import Rotation as R
 
 
-def rotation_to_euler(M, cy_thresh=None, seq='zyx'):
-    M = np.asarray(M)
-    if cy_thresh is None:
-        try:
-            cy_thresh = np.finfo(M.dtype).eps * 4
-        except ValueError:
-            cy_thresh = np.finfo(float).eps * 4.0  # _FLOAT_EPS_4
-    r11, r12, r13, r21, r22, r23, r31, r32, r33 = M.flat
-    # cy: sqrt((cos(y)*cos(z))**2 + (cos(x)*cos(y))**2)
-    cy = np.sqrt(r33 * r33 + r23 * r23)
-    if seq == 'zyx':
-        if cy > cy_thresh:  # cos(y) not close to zero, standard form
-            z = np.arctan2(-r12, r11)  # atan2(cos(y)*sin(z), cos(y)*cos(z))
-            y = np.arctan2(r13, cy)  # atan2(sin(y), cy)
-            x = np.arctan2(-r23, r33)  # atan2(cos(y)*sin(x), cos(x)*cos(y))
-        else:  # cos(y) (close to) zero, so x -> 0.0 (see above)
-            # so r21 -> sin(z), r22 -> cos(z) and
-            z = np.arctan2(r21, r22)
-            y = np.arctan2(r13, cy)  # atan2(sin(y), cy)
-            x = 0.0
-    elif seq == 'xyz':
-        if cy > cy_thresh:
-            y = np.arctan2(-r31, cy)
-            x = np.arctan2(r32, r33)
-            z = np.arctan2(r21, r11)
-        else:
-            z = 0.0
-            if r31 < 0:
-                y = np.pi / 2
-                x = np.arctan2(r12, r13)
-            else:
-                y = -np.pi / 2
-    else:
-        raise Exception('Sequence not recognized')
-    return [z, y, x]
-
+def rotation_to_euler(R_matrix, seq='zyx'):
+    return R.from_matrix(R_matrix).as_euler(seq)
 
 class KITTI(torch.utils.data.Dataset):
     def __init__(self,
-                 data_path=r"data/sequences_jpg",
+                 data_path=r"data/sequences",
                  gt_path=r"data/poses",
                  camera_id="2",
                  sequences=["00", "02", "08", "09"],
@@ -53,12 +20,11 @@ class KITTI(torch.utils.data.Dataset):
                  max_skip=0,
                  transform=None,
                  resize=(640, 640)):
-        
-        # KITTI normalization (extracted from github.com/aofrancani/TSformer-VO)
-        self.mean_angles = np.array([1.7061e-5, 9.5582e-4, -5.5258e-5])
-        self.std_angles = np.array([2.8256e-3, 1.7771e-2, 3.2326e-3])
-        self.mean_t = np.array([-8.6736e-5, -1.6038e-2, 9.0033e-1])
-        self.std_t = np.array([2.5584e-2, 1.8545e-2, 3.0352e-1])
+        # KITTI normalization
+        self.mean_angles = np.array([0.0, 0.0, 0.0])
+        self.std_angles = np.array([0.01,0.01,0.01])
+        self.mean_t = np.array([0.0, 0.0, 0.0])
+        self.std_t = np.array([0.2,0.2,1.0])
         
         self.data_path = data_path
         self.gt_path = gt_path
