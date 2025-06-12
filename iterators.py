@@ -73,7 +73,7 @@ def get_kitti(data_path, size, train_sequences, val_sequences, max_skip, train):
                 sequences=train_sequences if train else val_sequences,
                 resize=size,
                 apply_rcr=train,
-                max_skip=max_skip)
+                max_skip=max_skip if train else 0)
     
 
 def get_queenscamp(data_path, size, train_sequences, val_sequences, max_skip, train):
@@ -93,9 +93,9 @@ def get_queenscamp(data_path, size, train_sequences, val_sequences, max_skip, tr
     return QueensCAMP(data_path=data_path,
                       resize=size,
                       apply_rcr=train,
-                      max_skip=max_skip,
                       sequences=train_sequences if train else val_sequences, 
-                      transform=preprocess)
+                      transform=preprocess,
+                      max_skip=max_skip if train else 0)
     
     
 if __name__ == "__main__":
