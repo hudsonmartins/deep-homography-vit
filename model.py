@@ -62,7 +62,7 @@ class HomographyRegressor(nn.Module):
         self.regressor = nn.Sequential(
             nn.Linear(config.vit.dim_emb, 256),
             nn.ReLU(),
-            nn.Linear(256, 8)  # Homography: 8 DoF
+            nn.Linear(256, 8)  # 4-point Homography
         )
 
     def forward(self, data):
@@ -76,10 +76,11 @@ class VORegressor(nn.Module):
         self.encoder = ViTEncoder(config)
 
         # Load pretrained homography weights into encoder
-        logging.info("Loading homography encoder weights")
-        checkpoint = torch.load(config.vit.homography_weights, map_location=torch.device("cuda"))
-        state_dict = checkpoint['model_state_dict']
-        self.encoder.load_state_dict(state_dict, strict=False)
+        if(config.vit.homography_weights):
+            logging.info("Loading homography encoder weights")
+            checkpoint = torch.load(config.vit.homography_weights, map_location=torch.device("cuda"))
+            state_dict = checkpoint['model_state_dict']
+            self.encoder.load_state_dict(state_dict, strict=False)
 
         self.adapter = nn.Sequential(
             nn.Conv2d(5, 3, kernel_size=1, bias=False)
